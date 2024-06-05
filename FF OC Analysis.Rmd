@@ -1,0 +1,213 @@
+---
+title: "FF OC Analysis"
+author: "Nate Besold"
+date: "2024-05-29"
+output: html_document
+---
+
+```{r}
+points2019 <- points2019 %>%
+  mutate(Year = 2019)
+points2020 <- points2020 %>%
+  mutate(Year = 2020)
+points2021 <- points2021 %>%
+  mutate(Year = 2021)
+points2022 <- points2022 %>%
+  mutate(Year = 2022)
+points2023 <- points2023 %>%
+  mutate(Year = 2023)
+```
+
+```{r}
+adp2023 <- read.csv("2023 FF ADP.csv")
+adp2022 <- read.csv("2022 FF ADP.csv")
+adp2021 <- read.csv("2021 FF ADP.csv")
+adp2020 <- read.csv("2020 FF ADP.csv")
+adp2019 <- read.csv("2019 FF ADP.csv")
+```
+
+```{r}
+adp2023 <- adp2023 %>%
+  mutate(Year = 2023)
+adp2022 <- adp2022 %>%
+  mutate(Year = 2022)
+adp2021 <- adp2021 %>%
+  mutate(Year = 2021)
+adp2020 <- adp2020 %>%
+  mutate(Year = 2020)
+adp2019 <- adp2019 %>%
+  mutate(Year = 2019)
+```
+
+
+```{r}
+#Create vector with teams with new OC 2023
+newoc2023 <- c("ARI", "BAL", "CAR", "DEN", "HOU", "IND", "LAC", "NWE", "NYJ", "PHI", "TAM", "TEN", "WAS")
+
+# Add a new column 'first_year_oc' and set it to 1 for players in the specified teams
+adp2023 <- adp2023 %>%
+  mutate(newoc = ifelse(Team %in% newoc2023, 1, 0))
+
+# 2022
+newoc2022 <- c("BUF", "CAR", "CHI", "DEN", "DET", "HOU", "JAX", "LV", "MIA", "MIN", "NYG")
+
+adp2022 <- adp2022 %>%
+  mutate(newoc = ifelse(Team %in% newoc2022, 1, 0))
+
+#2021
+newoc2021 <- c("ATL", "DET", "HOU", "LAC", "MIA", "MIN", "NYJ", "PHI")
+
+adp2021 <- adp2021 %>%
+  mutate(newoc = ifelse(Team %in% newoc2021, 1, 0))
+
+# 2020
+newoc2020 <- c("CAR", "CLE", "DAL", "DEN", "HOU", "JAX", "LAC", "MIA", "MIN", "NYG", "WAS")
+
+adp2020 <- adp2020 %>%
+  mutate(newoc = ifelse(Team %in% newoc2020, 1, 0))
+
+# 2019
+newoc2019 <- c("CIN", "CLE", "DAL", "DEN", "DET", "GNB", "JAX", "MIA", "MIN", "NYJ", "TAM", "TEN")
+
+adp2019 <- adp2019 %>%
+  mutate(newoc = ifelse(Team %in% newoc2019, 1, 0))
+```
+
+# vbd line underneath
+```{r} 
+# vbd2019 <- points2019 %>% select(VBD, Year)
+vbd2020 <- points2020 %>% select(VBD, Year)
+vbd2021 <- points2021 %>% select(VBD, Year)
+vbd2022 <- points2022 %>% select(VBD, Year)
+vbd2023 <- points2023 %>% select(VBD, Year)
+vbd_combined <- bind_rows(vbd2019, vbd2020, vbd2021, vbd2022, vbd2023)
+vbd_combined <- vbd_combined %>%
+  group_by(Year) %>%
+  mutate(Rank = rank(-VBD, ties.method = "first")) %>%
+  ungroup()
+vbd_combined[is.na(vbd_combined)] <- 0
+
+mean_vbd_by_rank <- vbd_combined %>%
+  group_by(Rank) %>%
+  summarise(mean_VBD = mean(VBD, na.rm = TRUE))
+
+mastersheet[is.na(mastersheet)] <- 0
+mastersheet$AverageDraftPositionPPR <- as.integer(mastersheet$AverageDraftPositionPPR)
+
+
+mean_vbd_by_rank <- mean_vbd_by_rank %>%
+  rename(
+    OvRank = Rank,
+  )
+
+mean_vbd_by_rank['mean_VBD_preseason'] = mean_vbd_by_rank['mean_VBD']
+mean_vbd_by_rank
+
+mastersheet
+
+#having issues here with mastersheet1 merging
+#this is mayeb where it starts, need to figure out 0s in mean_diff dfs
+#mastersheet is fine can still use
+
+
+mastersheet2 <- merge(mastersheet, mean_vbd_by_rank_preseason, on = "AverageDraftPositionPPR")
+# mastersheet1 <- subset(mastersheet1, select = -mean_VBD_preseason)
+
+mastersheet2 <- mastersheet2 %>%
+  mutate(vbdrank_diff = VBD - mean_VBD_preseason)
+
+mastersheet2
+``` 
+
+```{r}
+all2023 <- all2023 %>%
+  mutate(
+    PreseasonRank = as.numeric(gsub("[^0-9]", "", PositionRank)),
+    EOSRank = as.numeric(gsub("[^0-9]", "", Rank.y))
+  )
+```
+
+
+```{r}
+pointsall <- bind_rows(points2019, points2020, points2021, points2022, points2023)
+adpall <- bind_rows(adp2019, adp2020, adp2021, adp2022, adp2023)
+
+pointsall$Player <- gsub("[*+]", "", pointsall$Player)
+
+colnames(pointsall)[colnames(pointsall) == "Player"] <- "Name"
+
+mastersheet <- merge(adpall, pointsall, by = c("Name", "Year"))
+
+mastersheet <- mastersheet %>%
+  mutate(
+    PreseasonRank = as.numeric(gsub("[^0-9]", "", PositionRank)),
+    EOSRank = as.numeric(gsub("[^0-9]", "", PosRank))
+  )
+
+# Subtract new rankings columns to get differenteial
+mastersheet <- mastersheet %>%
+  mutate(rank_diff = PreseasonRank - EOSRank)
+
+```
+
+```{r}
+library(broom)
+library(knitr)
+library(ggplot2)
+```
+
+```{r}
+dummyresults <- mastersheet %>%
+  group_by(newoc) %>%
+  summarize(mean_rank_diff = mean(rank_diff, na.rm = TRUE),
+            median_rank_diff = median(rank_diff, na.rm = TRUE),
+            mean_prerank = mean(PreseasonRank, na.rm = TRUE),
+            median_prerank = median(PreseasonRank, na.rm = TRUE),
+            mean_eosrank = mean(EOSRank, na.rm = TRUE),
+            median_eosrank = median(EOSRank, na.rm = TRUE),
+            count = n())
+
+t_test_result <- t.test(rank_diff ~ newoc, data = mastersheet)
+print(t_test_result)
+```
+
+```{r}
+ocmodel <- lm(rank_diff ~ newoc, data = mastersheet)
+summary(ocmodel)
+t_test_result <- t.test(rank_diff ~ newoc, data = mastersheet)
+
+# Print the result
+print(t_test_result)
+if (t_test_result$p.value < 0.05) {
+  cat("There is a statistically significant difference in adp underperformance between teams with and without a new offensive coordinator.")
+} else {
+  cat("There is no statistically significant difference in adp underperformance between teams with and without a new offensive coordinator.")
+}
+```
+#vbd t tests and significance
+```{r}
+vbddummyresults <- mastersheet2 %>%
+  group_by(newoc) %>%
+  summarize(mean_rank_diff = mean(vbdrank_diff, na.rm = TRUE),
+            median_rank_diff = median(vbdrank_diff, na.rm = TRUE),
+            mean_prerank = mean(vbdrank_diff, na.rm = TRUE),
+            median_prerank = median(vbdrank_diff, na.rm = TRUE),
+            mean_eosrank = mean(vbdrank_diff, na.rm = TRUE),
+            median_eosrank = median(vbdrank_diff, na.rm = TRUE),
+            count = n())
+
+vbdt_test_result <- t.test(vbdrank_diff ~ newoc, data = mastersheet2)
+print(vbdt_test_result)
+vbddummyresults
+
+```
+
+```{r}
+# Create scatter plot
+ggplot(mastersheet2, aes(x = mean_VBD_preseason, y = VBD)) +
+  geom_point() +
+  ggtitle("Scatter Plot") +
+  xlab("X Axis") +
+  ylab("Y Axis")
+```
+
